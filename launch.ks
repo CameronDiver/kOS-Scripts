@@ -3,8 +3,8 @@
 
 // Helper functions
 function angleToUp {
-  set sVec to SHIP:PROGRADE:VECTOR.
-  set uVec to UP:VECTOR.
+  set sVec to SHIP:PROGRADE:VECTOR:NORMALIZED.
+  set uVec to UP:VECTOR:NORMALIZED.
   set cosTheta to (uVec * sVec) / (uVec:MAG * sVec:MAG).
   set theta to ARCCOS(cosTheta).
   return theta.
@@ -12,12 +12,12 @@ function angleToUp {
 
 function pitch {
   parameter theta.
-  return ANGLEAXIS(theta, SHIP:PROGRADE:STARVECTOR) * SHIP:PROGRADE.
+  return ANGLEAXIS(theta, SHIP:PROGRADE:STARVECTOR:NORMALIZED) * SHIP:PROGRADE:VECTOR:NORMALIZED.
 }
 
 // Initial setup
 // SAS doesn't seem to help...
-// SAS ON.
+SAS ON.
 SET SASMODE TO "STABILITYASSIST".
 
 // Config vars
