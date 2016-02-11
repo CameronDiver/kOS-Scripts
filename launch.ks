@@ -1,4 +1,7 @@
-// Launch script which using kOS
+// Launch script using kOS on KSP
+// This script does not execute the most efficient of launches,
+// but is designed to work as best as possible with the widest 
+// range of crafts, and it does that pretty well.
 
 
 // Helper functions
@@ -9,10 +12,32 @@ function angleToUp {
   set theta to ARCCOS(cosTheta).
   return theta.
 }
-
+// Get a pitch direction given an angle
 function pitch {
   parameter theta.
   return ANGLEAXIS(theta, SHIP:PROGRADE:STARVECTOR:NORMALIZED) * SHIP:PROGRADE:VECTOR:NORMALIZED.
+}
+
+// Check if the craft needs to be staged, works with asparagus
+// staging and standard
+function stageIfNeeded {
+  if SHIP:MAXTHRUST = 0 {
+    stage.
+  } else {
+    // Get all engines
+    set flamed to 0.
+    list ENGINES in engines.
+    for eng in engines {
+      if eng:FLAMEOUT {
+        set flamed to flamed + 1.
+      }
+    }
+
+    if flamed > 0 {
+      stage.
+    }
+    
+  }
 }
 
 // Initial setup
@@ -22,10 +47,10 @@ SET SASMODE TO "STABILITYASSIST".
 
 // Config vars
 set gravityTurnVel to 100.0.
-set gravityTurnMult to 10.
-// Follow the prograde vector round after the gravity turn, but ahead
+set gravityTurnMult to 7.5.
+// Follow the prograde vector round after the gravity turn, but behind
 // by an offset of this many degrees
-set gravityTurnFollowRetard to 1.5.
+set gravityTurnRotate to 1.0.
 set gravityTurnDirection to 90. // East
 set desiredOrbitAlt to 100000.
 
@@ -33,9 +58,10 @@ set countdownLength to 5.
 
 // State vars
 set currentStage to 0.
-set currentThrottle to 0.75.
+set currentThrottle to 1.00.
 set currentTurn to 90.
 set outputTurn to false.
+set outputPitch to false.
 
 clearscreen.
 
@@ -60,20 +86,11 @@ LOCK THROTTLE TO currentThrottle.
 // Launch the vessel
 print "...Liftoff!".
 
-WHEN MAXTHRUST = 0 THEN {
-  set currentStage to currentStage + 1.
-
-  print "Moving to stage " + currentStage.
-
-  // Execute the stage
-  STAGE.
-  // Preserve this when clause
-  PRESERVE.
-}
-
 UNTIL APOAPSIS >= desiredOrbitAlt {
 
-// TODO: Add checks for minimum altitude
+  stageIfNeeded.
+
+  // TODO: Add checks for minimum altitude
   IF SHIP:VELOCITY:SURFACE:MAG < gravityTurnVel {
 
     // Straight up, 'in the east direction'
@@ -83,23 +100,22 @@ UNTIL APOAPSIS >= desiredOrbitAlt {
     set currentTurn to
         90 - (SHIP:VELOCITY:SURFACE:MAG / gravityTurnVel) * gravityTurnMult.
 
-    IF currentTurn <= 55.0 {
+    IF currentTurn <= 45.0 {
       // Track the prograde as gravity pulls it down
 
       // Check that the prograde has followed
-      if angleToUp < 60.0 {
-        //LOCK STEERING TO HEADING(gravityTurnDirection, 45.0).
-        print "Pitching forwards slightly        " at (0, 15).
-        set newHeading to pitch(1.5).
-        LOCK STEERING TO newHeading.
+      // If the prograde vector hasn't followed round yet,
+      // just let gravity pull it down by thrusting prograde
+      if angleToUp < 55.0 {
+        LOCK STEERING TO PROGRADE.
 
       } else {
-        print "Pitching forwards to complete turn" at (0,15).
-        // Get the ships prograde, and aim some degrees above it
-        // Get the rotation vector
-        //set newHeading to pitch(-gravityTurnFollowRetard).
+        if not outputPitch {
+          print "Pitching slightly backwards as gravity pulls us down.".
+          set outputPitch to true.
+        }
         
-        set newHeading to pitch(gravityTurnRotate)
+        set newHeading to pitch(-gravityTurnRotate).
         LOCK STEERING TO newHeading.
 
         // If the above code isn't working, this may, but is less
@@ -107,12 +123,17 @@ UNTIL APOAPSIS >= desiredOrbitAlt {
         //LOCK STEERING TO SHIP:PROGRADE.
       }
     } ELSE {
+
       IF not outputTurn {
         set outputTurn to true.
         PRINT "Initiating gravity turn.".
       }
+
       LOCK STEERING TO HEADING(gravityTurnDirection, currentTurn).
     }
   }
 }
 
+
+print "Apoapsis is above " + round(desiredOrbitAlt, 2) + "m, stopping.".
+LOCK THROTTLE TO 0.0.
